@@ -1,0 +1,83 @@
+Detalles de configuracion.
+Archivos Vagrant--> 
+	# -*- mode: ruby -*-
+	# vi: set ft=ruby :
+
+	Vagrant.configure("2") do |config|
+  	config.vm.define :servidorPXE do |servidorPXE|
+   	servidorPXE.vm.box = "bento/centos-7.8"
+   	servidorPXE.vm.network :private_network, ip: "172.168.1.11"
+   	servidorPXE.vm.hostname= "servidorPXE"
+	 end
+	end
+
+Ip del servidor: 172.168.1.11
+Nombre del host: servidor.servidorPXE.com
+Sistema Operativo: CentOS 7.8
+SElinux: Hailitado
+Firewall: Habilitado 
+
+guia de configuración del servidorPXE obtenida de: https://www.linuxtechi.com/configure-pxe-installation-server-centos-7/
+
+####### Pasos a seguir y Comandos empleados ########################
+
+>PASO 1: INSTALACIÓN DE PAQUETES PARA LA CONFIGURACIÓN DEL SERVIDORPXE
+
+Se instalan los paquetes necesarios "dhcp,tftp-server,ftp server(vsftpd),xinted" con el siguiente comando:
+	- yum install dhcp tftp tftp-server syslinux vsftpd xinetd
+
+
+>PASO 2: CONFIGURACIÓN DEL DHCP 
+
+Se realiza la configuración del archivo dhcp ubicado en /etc/dhcp/dhcpd.conf de acuerdo a la guia.
+
+>PASO 3: CONFIGURACIÓN DEL TFTP Trivial File Transfer Protocol (/etc/xinetd.d/tftp)
+
+(1)El tftp se utiliza para la carga de arranque, con este podremos transferir los archivos sin ningún tipo de autenticación. 
+(2)El archivo de configuración se encuentra en la ubicación /etc/xinetd.d/tftp
+(3)Todos los archivos relacionados con el arranque se encuentran en el directorio /var/lib/tftpboot/ en la cual pondremos los archivos de red necesarios.
+	- cp -v /usr/share/syslinux/pxelinux.0 /var/lib/tftpboot
+	- cp -v /usr/share/syslinux/menu.c32 /var/lib/tftpboot
+	- cp -v /usr/share/syslinux/memdisk /var/lib/tftpboot
+	- cp -v /usr/share/syslinux/mboot.c32 /var/lib/tftpboot
+	- cp -v /usr/share/syslinux/chain.c32 /var/lib/tftpboot
+	- mkdir /var/lib/tftpboot/pxelinux.cfg
+	- mkdir /var/lib/tftpboot/networkboot
+
+>PASO 4: MONTAR EL ARCHIVO ISO A UTILIZAR Y COPIAR EL CONTENIDO EN EL FTP.
+
+En este caso se descargo el archvio iso ubicado en http://mirror.unimagdalena.edu.co/centos/7.8.2003/isos/x86_64/CentOS-7-x86_64-DVD-2003.iso
+y se copio el contenido en /var/ftp/pub/ con los comandos.
+	- mount -o loop CentOS-7-x86_64-DVD-1511.iso /mnt/
+	- cd /mnt/
+	- cp -av * /var/ftp/pub/
+se copia el kernel y el initdr del archivo iso en la ubicacion '/var/lib/tftpboot/networkboot/'
+	- cp /mnt/images/pxeboot/vmlinuz /var/lib/tftpboot/networkboot/
+	- cp /mnt/images/pxeboot/initrd.img /var/lib/tftpboot/networkboot/
+se desmonta el archivo iso usando el comando:
+	- umount /mnt/
+
+>PASO 5: CREAR LOS ARCHIVOS KICKSTART Y PXE
+Se prodece a crear los archivos como se indica en la guia ubicados /var/ftp/pub/centos7.cfg y /var/lib/tftpboot/pxelinux.cfg/default respectivamente 
+
+>PASO 6: INICIALIZACIÓN Y HABILITACIÓN DE SERVICIOS 
+Para ello se utilizaron los comando:
+	-systemctl start xinetd
+	-systemctl start dhcpd.service
+	-systemctl start vsftpd
+Para SElinux se establece lo siguiente:
+	- setsebool -P allow_ftpd_full_access 1
+Se aperturan algunos puertos del firewall
+	-irewall-cmd --add-service=ftp --permanent
+	-firewall-cmd --add-service=dhcp --permanent
+	-firewall-cmd --add-port=69/tcp --permanent 
+	-firewall-cmd --add-port=69/udp --permanent
+	-firewall-cmd --add-port=4011/udp --permanent
+	-firewall-cmd --reload
+>PASO 7: ARRANQUE DE CLIENTES
+Para este paso se crea un cliente directamente en virtual box.
+En cuanto a su configuración: 	En SISTEMA se le da la orden de arranque unicamente en RED
+				En RED en el adapatador que se encuentre habilitado se conecta a Adaptador soló-anfitrión y a la red donde se encuentre el servidorPXE.	
+	
+
+
